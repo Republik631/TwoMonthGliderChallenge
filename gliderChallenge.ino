@@ -25,7 +25,7 @@ Adafruit_BMP3XX bmp;
 ICM_20948_I2C myICM;  // Otherwise create an ICM_20948_I2C object
 
 // Teensy4.0
-int ledPin =  13; //Status LED connected to digital pin 13
+int ledPin = 13; //Status LED connected to digital pin 13
 
 
 bool HOTWIRE_ACTIVATED = false;
@@ -74,20 +74,8 @@ void setup() {
   // Teensy4.0 Setup
   pinMode(ledPin, OUTPUT); 
 
+  recordTime = millis();
   
-  bool HOTWIRE_ACTIVATED = false;
-  bool HOTWIRE_FINISHED = false;
-  bool HOTWIRE_SUCCESS = false;
-
-  float desiredAlt = 290;
-  
-  float recordTime = millis();
-  float altTime = millis();
-  float hotwireTime = 0;
-  float averageCounter = 0;
-  float averageAltitude = 0;
-  float dropAlt = 0;
-      
   while (!HOTWIRE_SUCCESS) {
     
     // Record data every .5 seconds
@@ -164,8 +152,6 @@ int checkAltitude() {
 }
 
 
-
-
 void recordData() {
 
   // Time of recording
@@ -186,7 +172,7 @@ void recordData() {
 
   Serial.println();
   
-  // ICM20948 Data Collection
+  // ICM29048 Data Collection
   // Not sure about formatting yet
 
 
