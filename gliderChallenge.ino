@@ -6,7 +6,6 @@
  */
 
 
-
 #include <SPI.h>
 #include <Wire.h>
 #include "ICM_20948.h"
@@ -21,21 +20,22 @@ Adafruit_BMP3XX bmp;
 
 // ICM20948
 #define WIRE_PORT Wire  // Your desired Wire port.
-#define AD0_VAL   1     // The value of the last bit of the I2C address. 
+#define AD0_VAL   1     // The value of the last bit of the I2C address.
 ICM_20948_I2C myICM;  // Otherwise create an ICM_20948_I2C object
 
 // Teensy4.0
 int ledPin = 13; //Status LED connected to digital pin 13
+int brightLED = 5; // Or whatever pin we use for the leds
+int hotwirePin = 3; // Again, not sure if this is the pin we'll use yet
 
-
+// Global variables
 bool HOTWIRE_ACTIVATED = false;
 bool HOTWIRE_FINISHED = false;
 bool HOTWIRE_SUCCESS = false;
-
-float desiredAlt = 290;
-
-float recordTime = millis();
-float altTime = millis();
+float desiredAlt = 290;     // Drop altitude in meters
+float recordTime = 0;
+float altTime = 0;
+float ledTime = 0;
 float hotwireTime = 0;
 float averageCounter = 0;
 float averageAltitude = 0;
@@ -75,6 +75,8 @@ void setup() {
   pinMode(ledPin, OUTPUT); 
 
   recordTime = millis();
+  ledTime = millis();
+  altTime = millis();
   
   while (!HOTWIRE_SUCCESS) {
     
@@ -93,7 +95,6 @@ void setup() {
       // Effectively checks the average altitude over a duration of .1 seconds
       if ((averageCounter == 10) || (averageAltitude / averageCounter >= desiredAlt)) {
         hotwireON();
-        HOTWIRE_ACTIVATED = true;
         hotwireTime = millis();
         averageAltitude = 0;
         averageCounter = 0;
@@ -109,7 +110,6 @@ void setup() {
     // Turn off hotwire after 6 seconds.
     if ((HOTWIRE_ACTIVATED == true) || (millis() - hotwireTime >= 6000)) {
       hotwireOFF();
-      HOTWIRE_ACTIVATED = false;
       HOTWIRE_FINISHED = true;
 
       dropAlt = checkAltitude();
@@ -133,6 +133,15 @@ void setup() {
         averageCounter = 0;
       }      
     }
+
+    if((digitalRead(brightLED) == 0) || (millis() - ledTime >= 800)) {//Turn the status LED on/off as we go
+      digitalWrite(brightLED, HIGH);
+      ledTime = millis();
+      
+    } else if ((digitalRead(brightLED) == 1) || (millis() - ledTime >= 200)) {
+      digitalWrite(brightLED, LOW);
+      ledTime = millis();
+    }
   }
 }
 
@@ -141,6 +150,15 @@ void loop() {
   if (millis() - recordTime >= 500) {
     recordData();
     recordTime = millis();
+  }
+
+  if((digitalRead(brightLED) == 0) || (millis() - ledTime >= 800)) {//Turn the status LED on/off as we go
+    digitalWrite(brightLED, HIGH);
+    ledTime = millis();
+    
+  } else if ((digitalRead(brightLED) == 1) || (millis() - ledTime >= 200)) {
+    digitalWrite(brightLED, LOW);
+    ledTime = millis();
   }
 }
 
@@ -170,22 +188,72 @@ void recordData() {
   Serial1.print(bmp.readAltitude(SEALEVELPRESSURE_HPA));
   Serial1.println(" m");
 
-  Serial.println();
+  Serial1.println();
   
   // ICM29048 Data Collection
   // Not sure about formatting yet
-
-
-  
+  Serial1.print("Scaled. Acc (mg) [ ");
+  printFormattedFloat( myICM.accX(), 5, 2 );
+  Serial1.print(", ");
+  printFormattedFloat( myICM.accY(), 5, 2 );
+  Serial1.print(", ");
+  printFormattedFloat( myICM.accZ(), 5, 2 );
+  Serial1.print(" ], Gyr (DPS) [ ");
+  printFormattedFloat( myICM.gyrX(), 5, 2 );
+  Serial1.print(", ");
+  printFormattedFloat( myICM.gyrY(), 5, 2 );
+  Serial1.print(", ");
+  printFormattedFloat( myICM.gyrZ(), 5, 2 );
+  Serial1.print(" ], Mag (uT) [ ");
+  printFormattedFloat( myICM.magX(), 5, 2 );
+  Serial1.print(", ");
+  printFormattedFloat( myICM.magY(), 5, 2 );
+  Serial1.print(", ");
+  printFormattedFloat( myICM.magZ(), 5, 2 );
+  Serial1.print(" ], Tmp (C) [ ");
+  printFormattedFloat( myICM.temp(), 5, 2 );
+  Serial1.print(" ]");
+  Serial1.println();
   
 }
 
+// Only used to format the ICM data. MAY NOT BE NECESSARY!
+void printFormattedFloat(float val, uint8_t leading, uint8_t decimals){
+  float aval = abs(val);
+  if(val < 0){
+    Serial1.print("-");
+  }else{
+    Serial1.print(" ");
+  }
+  for( uint8_t indi = 0; indi < leading; indi++ ){
+    uint32_t tenpow = 0;
+    if( indi < (leading-1) ){
+      tenpow = 1;
+    }
+    for(uint8_t c = 0; c < (leading-1-indi); c++){
+      tenpow *= 10;
+    }
+    if( aval < tenpow){
+      Serial1.print("0");
+    }else{
+      break;
+    }
+  }
+  if(val < 0){
+    Serial1.print(-val, decimals);
+  }else{
+    Serial1.print(val, decimals);
+  }
+}
 
-// Maybe these don't need to be functions
+// Pass voltage across the MOSFET control pin to turn on the hotwire.
 void hotwireON() {
-  // set some pin to HIGH
+  digitalWrite(hotwirePin, HIGH);
+  HOTWIRE_ACTIVATED = true;
 }
 
+// Turn off the MOSFET control pin for the hotwire.
 void hotwireOFF() {
-  // set some pin to LOW
+  digitalWrite(hotwirePin, LOW);
+  HOTWIRE_ACTIVATED = false;
 }
