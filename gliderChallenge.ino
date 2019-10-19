@@ -4,18 +4,13 @@
  * Brennan Haralson, Aninoritsela Okorodudu, Matthew Wilson, Hughston Turner, Ben Lambert
  * Mentored by Joseph Hayes and Morenike Doherty
  */
-
-
-#include <SPI.h>
-#include <Wire.h>
+#include <Wire.h> 
 #include "ICM_20948.h"
 #include "Adafruit_BMP3XX.h"
 #include <Adafruit_Sensor.h>
 
 // BMP388 I2C
-#define BMP_SCK 17 // Check if these work
-#define BMP_MOSI 16
-#define SEALEVELPRESSURE_HPA (1016.6)
+#define SEALEVELPRESSURE_HPA (1014.2)
 Adafruit_BMP3XX bmp;
 
 // ICM20948
@@ -24,8 +19,7 @@ Adafruit_BMP3XX bmp;
 ICM_20948_I2C myICM;  // Otherwise create an ICM_20948_I2C object
 
 // Teensy4.0
-int ledPin = 13; //Status LED connected to digital pin 13
-int brightLED = 5; // Or whatever pin we use for the leds
+int brightLED = 13; // Or whatever pin we use for the leds
 int hotwirePin = 3; // Again, not sure if this is the pin we'll use yet
 
 // Global variables
@@ -43,14 +37,23 @@ float dropAlt = 0;
 
 
 void setup() {
-   
+  
+  Serial.begin(115200);
+  while (!Serial);
+  Serial.println("BMP388 test");
+
+  if (!bmp.begin(0x77)) {
+    Serial.println("Could not find a valid BMP3 sensor, check wiring!");
+    while (1);
+  }
   // BMP388 Set up oversampling and filter initialization
   bmp.setTemperatureOversampling(BMP3_OVERSAMPLING_8X);
   bmp.setPressureOversampling(BMP3_OVERSAMPLING_4X);
   bmp.setIIRFilterCoeff(BMP3_IIR_FILTER_COEFF_3);
 
+while(!Serial){};
   // ICM20948 Setup
-  WIRE_PORT.begin();
+  WIRE_PORT.begin(0x68);
   WIRE_PORT.setClock(400000);
   bool initialized = false;
   
@@ -58,21 +61,25 @@ void setup() {
 
     myICM.begin( WIRE_PORT, AD0_VAL );
 
+    Serial.print( F("Initialization of the sensor returned: ") );
+    Serial.println( myICM.statusString() );
     if( myICM.status != ICM_20948_Stat_Ok ){
+      Serial.println( "Trying again..." );
       delay(500);
     }else{
       initialized = true;
     }
+
   }
 
   // Openlog Setup
-  Serial1.begin(9600); //9600bps is default for OpenLog
+  Serial.begin(9600); //9600bps is default for OpenLog
   delay(1000); //Wait a second for OpenLog to init
-  Serial1.println("Glider Challenge Team 13 test"); 
+  Serial.println("Glider Challenge Team 13 test"); 
 
 
   // Teensy4.0 Setup
-  pinMode(ledPin, OUTPUT); 
+  pinMode(brightLED, OUTPUT); 
 
   recordTime = millis();
   ledTime = millis();
@@ -87,19 +94,19 @@ void setup() {
     }
 
     // Check if the glider is above desiredAlt for a period of .1 seconds.
-    if ((millis() - altTime >= 10) || (HOTWIRE_ACTIVATED == false) || (HOTWIRE_FINISHED == false)) {
+    if ((millis() - altTime >= 50) && (HOTWIRE_ACTIVATED == false) && (HOTWIRE_FINISHED == false)) {
       
       averageAltitude += checkAltitude();
       averageCounter++;
 
-      // Effectively checks the average altitude over a duration of .1 seconds
-      if ((averageCounter == 10) || (averageAltitude / averageCounter >= desiredAlt)) {
+      // Effectively checks the average altitude over a duration of .5 seconds
+      if ((averageCounter == 10) && (averageAltitude / averageCounter >= desiredAlt)) {
         hotwireON();
         hotwireTime = millis();
         averageAltitude = 0;
         averageCounter = 0;
         
-      } else if ((averageCounter == 10) || (averageAltitude / averageCounter < desiredAlt)) {
+      } else if ((averageCounter == 10) && (averageAltitude / averageCounter < desiredAlt)) {
         averageAltitude = 0;
         averageCounter = 0;
       }
@@ -108,7 +115,7 @@ void setup() {
     }
 
     // Turn off hotwire after 6 seconds.
-    if ((HOTWIRE_ACTIVATED == true) || (millis() - hotwireTime >= 6000)) {
+    if ((HOTWIRE_ACTIVATED == true) && (millis() - hotwireTime >= 6000)) {
       hotwireOFF();
       HOTWIRE_FINISHED = true;
 
@@ -116,32 +123,26 @@ void setup() {
     }
 
     // Check if glider is descending over interval of 1 second.
-    if ((millis() - altTime >= 100) || (HOTWIRE_ACTIVATED == false) || (HOTWIRE_FINISHED == true)) {
+    if ((millis() - altTime >= 100) && (HOTWIRE_ACTIVATED == false) && (HOTWIRE_FINISHED == true)) {
     
       averageAltitude += checkAltitude();
       averageCounter++;
 
       // Effectively checks the average altitude over a duration of 1 second
-      if ((averageCounter == 10) || (averageAltitude / averageCounter < dropAlt)) {
+      if ((averageCounter == 10) && (averageAltitude / averageCounter < dropAlt)) {
         HOTWIRE_SUCCESS = true;
         averageAltitude = 0;
         averageCounter = 0;
         
-      } else if ((averageCounter == 10) || (averageAltitude / averageCounter >= dropAlt)) {
+      } else if ((averageCounter == 10) && (averageAltitude / averageCounter >= dropAlt)) {
         HOTWIRE_FINISHED = false;
         averageAltitude = 0;
         averageCounter = 0;
       }      
     }
 
-    if((digitalRead(brightLED) == 0) || (millis() - ledTime >= 800)) {//Turn the status LED on/off as we go
-      digitalWrite(brightLED, HIGH);
-      ledTime = millis();
-      
-    } else if ((digitalRead(brightLED) == 1) || (millis() - ledTime >= 200)) {
-      digitalWrite(brightLED, LOW);
-      ledTime = millis();
-    }
+    blinkLED();
+    
   }
 }
 
@@ -152,68 +153,63 @@ void loop() {
     recordTime = millis();
   }
 
-  if((digitalRead(brightLED) == 0) || (millis() - ledTime >= 800)) {//Turn the status LED on/off as we go
-    digitalWrite(brightLED, HIGH);
-    ledTime = millis();
-    
-  } else if ((digitalRead(brightLED) == 1) || (millis() - ledTime >= 200)) {
-    digitalWrite(brightLED, LOW);
-    ledTime = millis();
-  }
+  blinkLED();
 }
 
 
 
 
-int checkAltitude() {
+float checkAltitude() {
   return(bmp.readAltitude(SEALEVELPRESSURE_HPA));
 }
 
 
 void recordData() {
-
   // Time of recording
-  Serial1.println(millis());
+  Serial.print("Elapsed Time: ");
+  Serial.println(millis()-recordTime);
 
   // BMP388 Data Collection
-  Serial1.print("Temperature = ");
-  Serial1.print(bmp.temperature);
-  Serial1.println(" *C");
+  Serial.print("Temperature = ");
+  Serial.print(bmp.temperature);
+  Serial.println(" *C");
 
-  Serial1.print("Pressure = ");
-  Serial1.print(bmp.pressure / 100.0);
-  Serial1.println(" hPa");
+  Serial.print("Pressure = ");
+  Serial.print(bmp.pressure / 100.0);
+  Serial.println(" hPa");
 
-  Serial1.print("Altitude = ");
-  Serial1.print(bmp.readAltitude(SEALEVELPRESSURE_HPA));
-  Serial1.println(" m");
+  Serial.print("Altitude = ");
+  Serial.print(bmp.readAltitude(SEALEVELPRESSURE_HPA));
+  Serial.println(" m");
 
-  Serial1.println();
-  
+  Serial.println();
+
+
+  ICM_20948_AGMT_t agmt = myICM.getAGMT();
   // ICM29048 Data Collection
   // Not sure about formatting yet
-  Serial1.print("Scaled. Acc (mg) [ ");
+  Serial.print("Scaled. Acc (mg) [ ");
   printFormattedFloat( myICM.accX(), 5, 2 );
-  Serial1.print(", ");
+  Serial.print(", ");
   printFormattedFloat( myICM.accY(), 5, 2 );
-  Serial1.print(", ");
+  Serial.print(", ");
   printFormattedFloat( myICM.accZ(), 5, 2 );
-  Serial1.print(" ], Gyr (DPS) [ ");
+  Serial.print(" ], Gyr (DPS) [ ");
   printFormattedFloat( myICM.gyrX(), 5, 2 );
-  Serial1.print(", ");
+  Serial.print(", ");
   printFormattedFloat( myICM.gyrY(), 5, 2 );
-  Serial1.print(", ");
+  Serial.print(", ");
   printFormattedFloat( myICM.gyrZ(), 5, 2 );
-  Serial1.print(" ], Mag (uT) [ ");
+  Serial.print(" ], Mag (uT) [ ");
   printFormattedFloat( myICM.magX(), 5, 2 );
-  Serial1.print(", ");
+  Serial.print(", ");
   printFormattedFloat( myICM.magY(), 5, 2 );
-  Serial1.print(", ");
+  Serial.print(", ");
   printFormattedFloat( myICM.magZ(), 5, 2 );
-  Serial1.print(" ], Tmp (C) [ ");
+  Serial.print(" ], Tmp (C) [ ");
   printFormattedFloat( myICM.temp(), 5, 2 );
-  Serial1.print(" ]");
-  Serial1.println();
+  Serial.print(" ]");
+  Serial.println();
   
 }
 
@@ -221,9 +217,9 @@ void recordData() {
 void printFormattedFloat(float val, uint8_t leading, uint8_t decimals){
   float aval = abs(val);
   if(val < 0){
-    Serial1.print("-");
+    Serial.print("-");
   }else{
-    Serial1.print(" ");
+    Serial.print(" ");
   }
   for( uint8_t indi = 0; indi < leading; indi++ ){
     uint32_t tenpow = 0;
@@ -234,17 +230,30 @@ void printFormattedFloat(float val, uint8_t leading, uint8_t decimals){
       tenpow *= 10;
     }
     if( aval < tenpow){
-      Serial1.print("0");
+      Serial.print("0");
     }else{
       break;
     }
   }
   if(val < 0){
-    Serial1.print(-val, decimals);
+    Serial.print(-val, decimals);
   }else{
-    Serial1.print(val, decimals);
+    Serial.print(val, decimals);
   }
 }
+
+// Blink LED
+void blinkLED() {
+  if((digitalRead(brightLED) == LOW) && (millis() - ledTime >= 1200)) {//Turn the status LED on/off as we go
+    digitalWrite(brightLED, HIGH);
+    ledTime = millis();
+    
+  } else if ((digitalRead(brightLED) == HIGH) && (millis() - ledTime >= 400)) {
+    digitalWrite(brightLED, LOW);
+    ledTime = millis();
+  }
+}
+
 
 // Pass voltage across the MOSFET control pin to turn on the hotwire.
 void hotwireON() {
