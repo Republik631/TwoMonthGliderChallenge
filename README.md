@@ -8,4 +8,4 @@ Adafruit_BMP3XX_Library.zip
 
 SparkFun_9DoF_IMU_Breakout_-_ICM_20948_-_Arduino_Library.zip
   
- gliderChallenge.ino is the main program. It should be put in Documents > Arduino, and can then be opened. As of now it compiles without errors, so this is  good way to verify tht the code has no logic errors.
+ gliderChallenge.ino is the main program. It should be put in a Documents > Arduino > gliderChallenge , and can then be opened. As of now it compiles without errors, so this is  good way to verify tht the code has no logic errors.
