@@ -10,24 +10,24 @@
 #include <Adafruit_Sensor.h>
 
 // BMP388 I2C
-#define SEALEVELPRESSURE_HPA (1008.8) // Must be updated the day flight.
+#define SEALEVELPRESSURE_HPA (1012.7) // Must be updated the day flight.
 Adafruit_BMP3XX bmp;   // Create a Adafruit_BMP3XX object.
 
-// ICM20948
+// ICM20948 
 #define WIRE_PORT Wire  // Your desired Wire port.
 #define AD0_VAL   1     // The value of the last bit of the I2C address.
 ICM_20948_I2C myICM;  // Create an ICM_20948_I2C object.
 
 // Teensy4.0
 int brightLED = 2; // Or whatever pin we use for the leds
-int hotwirePin = 3; // Again, not sure if this is the pin we'll use yet
+int hotwirePin = 4; // Again, not sure if this is the pin we'll use yet
 
 // Global variables
 bool HOTWIRE_ACTIVATED = false;        // State of power to hotwire
 bool HOTWIRE_FINISHED = false;         // States whether the hotwire has been run
 bool HOTWIRE_SUCCESS = false;          // State of succes of the hotwire burn
 float localAlt = 0;                    // Local ground altitude
-float relativeAlt = 290;               // Drop altitude relative to local ground altitude in meters
+float relativeAlt = 290;               // Drop altitude relati ve to local ground altitude in meters
 float recordTime = 0;                  // Time since last recording
 float altTime = 0;                     // Time since last altitude reading
 float ledTime = 0;                     // Time since last LED state change
@@ -45,7 +45,7 @@ void setup() {
   //Serial1.println("GLIDER CHALLENGE TEAM 13");
   //Serial1.println("Data is collected approximately every 500 milliseconds.");
   //Serial1.println();
-  Serial1.println("temperature(bmp), pressure, altitude, accX, accY, accZ, gyrX, gyrY, gyrZ, magX, magY, magZ, temperature(icm), time since last recording, time elapsed");
+  Serial1.println("temperature(bmp), pressure, altitude, accX, accY, accZ, gyrX, gyrY, gyrZ, magX, magY, magZ, temperature(icm), hotwire Active?, time elapsed");
 
 
   /*** BMP388 Initialization ***/
@@ -88,6 +88,7 @@ void setup() {
 
   /*** Teensy4.0 Setup ***/
   pinMode(brightLED, OUTPUT); 
+  pinMode(hotwirePin, OUTPUT);                      
 
   // Begin timers
   recordTime = millis();
@@ -137,7 +138,7 @@ void setup() {
     }
 
     // Check the state of the hotwire and turn it off after 6 seconds.
-    if ((HOTWIRE_ACTIVATED == true) && (millis() - hotwireTime >= 6000)) {
+    if ((HOTWIRE_ACTIVATED == true) && (millis() - hotwireTime >= 4000)) {
       hotwireOFF();
       HOTWIRE_FINISHED = true;
       
@@ -182,6 +183,7 @@ void setup() {
   //Serial1.println(" m.");
 }
 
+
 // After a successful hotwire burn, the loop function takes over. 
 void loop() {
   // Record data every .5 seconds
@@ -189,11 +191,9 @@ void loop() {
     recordData();
     recordTime = millis();
   }
-
   // Blinks the LED on intervals specified in the blinkLED function.
   blinkLED();
 }
-
 
 
 // Check the current altitude.
@@ -201,10 +201,11 @@ float checkAltitude(float localAltitude) {
   return(bmp.readAltitude(SEALEVELPRESSURE_HPA) - localAltitude);
 }
 
+
 /* Write data out to the SD card.
  *  Data is written in the follwing order: 
- *  temperature(bmp), pressure, altitude, accelerometer(X, Y, Z), gyroscope(X, Y, Z), magnetometer(X, Y, Z), temperature(icm), timeElapsed
-*/
+ *  temperature(bmp), pressure, altitude, accelerometer(X, Y, Z), gyroscope(X, Y, Z), magnetometer(X, Y, Z), temperature(icm), hotwire state, time elapsed
+ */
 void recordData() {
 
   // BMP388 Data Collection
@@ -217,7 +218,6 @@ void recordData() {
   
   myICM.getAGMT();
   // ICM29048 Data Collection
-  // Not sure about formatting yet
   Serial1.print(myICM.accX());
   Serial1.print(", ");
   Serial1.print(myICM.accY());
@@ -239,12 +239,14 @@ void recordData() {
   Serial1.print(myICM.temp());
   Serial1.print(", ");
 
-  // Time of recording
-  Serial1.print(millis()-recordTime);
+  // State of hotwire
+  Serial1.print(HOTWIRE_ACTIVATED);
   Serial1.print(", ");
-  Serial1.println(millis());
   
+  // Time of recording
+  Serial1.println(millis());
 }
+
 
 // Blink LED on for 400 milliseconds, off for 1200 milliseconds.
 void blinkLED() {
@@ -266,6 +268,7 @@ void hotwireON() {
  // Serial1.println("Hotwire Fired");  // REMOVE
   hotwireFires++;
 }
+
 
 // Turn off the MOSFET control pin for the hotwire.
 void hotwireOFF() {
