@@ -86,7 +86,7 @@ void setup() {
     
     // Record data every .5 seconds
     if (millis() - recordTime >= 500) {
-      recordData();
+      recordData(localAlt);
       recordTime = millis();
     }
 
@@ -170,7 +170,7 @@ void setup() {
 void loop() {
   // Record data every .5 seconds
   if (millis() - recordTime >= 500) {
-    recordData();
+    recordData(localAlt);
     recordTime = millis();
   }
   // Blinks the LED on intervals specified in the blinkLED function.
@@ -188,14 +188,14 @@ float checkAltitude(float localAltitude) {
  *  Data is written in the follwing order: 
  *  temperature(bmp), pressure, altitude, accelerometer(X, Y, Z), gyroscope(X, Y, Z), magnetometer(X, Y, Z), temperature(icm), hotwire state, time elapsed
  */
-void recordData() {
+void recordData(float localAlt) {
 
   // BMP388 Data Collection
   Serial1.print(bmp.temperature);
   Serial1.print(", ");
   Serial1.print(bmp.pressure / 100.0);
   Serial1.print(", ");
-  Serial1.print(bmp.readAltitude(SEALEVELPRESSURE_HPA));
+  Serial1.print(bmp.readAltitude(SEALEVELPRESSURE_HPA) - localAlt);
   Serial1.print(", ");
   
   myICM.getAGMT();
