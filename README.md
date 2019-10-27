@@ -9,3 +9,14 @@ Restart the Arduino software and they should be installed. You can verify this b
 [ICM-20948 Library](SparkFun_9DoF_IMU_Breakout_-_ICM_20948_-_Arduino_Library.zip)
   
 [gliderChallenge_flight_v1.ino](gliderChallenge_flight_v1.ino) is the main program. It should be put in a Documents > Arduino > gliderChallenge_flight_v1, and can then be opened.
+
+The pins used are as follows:
+- GND - ground (all components)
+- Vin - 5V input (from 5v regulator)
+- 3V  - 3.3V output (openlog, bmp388, icm20948)
+- 0   - RX1 (openlog)
+- 1   - TX1 (openlog)
+- 2   - PWM (LED MOSFET)
+- 4   - PWM (hotwire MOSFET)
+- 18  - SDA (bmp388, icm20948)
+- 19  - SCL (bmp388, icm20948)
